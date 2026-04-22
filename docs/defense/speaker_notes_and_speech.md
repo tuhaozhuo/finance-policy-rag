@@ -1,329 +1,327 @@
-# Speaker Notes and Full Defense Speech
+# 答辩逐页讲稿与完整演讲稿
 
-The scripts below are written for a CS undergraduate defense. They use English technical terms where appropriate and avoid unsupported novelty claims.
+本文用于口头答辩准备。讲稿风格按计算机专业本科项目答辩撰写，尽量使用准确的技术术语，不夸大研究创新，不声称仓库没有支持的实验结果。
 
-## Part 1. Slide-by-Slide Speaker Notes
+## 第一部分：逐页 Speaker Notes
 
-### Slide 1. Title and System Scope
+### 第 1 页：标题与系统范围
 
-**Full speech script**
+**完整讲稿**
 
-Good morning, teachers. My project is a Financial Policy RAG Question Answering System. The goal is to build a backend system that can ingest financial regulation documents, retrieve relevant articles, and generate answers with citations. The current version is backend-first. It focuses on the technical pipeline: document parsing, metadata extraction, chunking, embedding, vector indexing, hybrid retrieval, answer generation, citation output, QA persistence, health checks, and evaluation scripts. It does not include a frontend or authentication module yet. I will present it as a backend acceptance version, not as a fully commercial product. The key idea is to make answers traceable to source documents rather than relying only on the language model's internal knowledge.
+各位老师好，我的项目是“基于 RAG 的金融制度知识问答系统”。这个系统的目标是构建一个后端服务，能够导入金融监管制度文档，检索相关条文，并生成带引用依据的答案。当前版本是后端优先版本，主要覆盖文档解析、元数据抽取、条文切分、embedding、向量索引、混合检索、LLM 问答生成、QA 记录持久化、健康检查和验收评测。它目前不包含前端和认证鉴权模块，所以我会把它定位为后端验收原型，而不是完整商业产品。系统设计的核心思想是：答案必须能追溯到原始制度条文，而不是完全依赖大模型内部知识。
 
-**Transition**
+**过渡句**
 
-Before discussing the architecture, I will first define the problem this system tries to solve.
+在介绍架构之前，我先说明这个系统要解决的具体问题。
 
-**Short version for memorization**
+**记忆版**
 
-This is a backend-first RAG system for financial policy documents. It supports ingestion, retrieval, citation-based QA, persistence, and evaluation. It is an acceptance prototype, not a full product.
+这是一个面向金融制度文档的后端 RAG 系统，支持导入、检索、带引用问答、持久化和评测，是后端验收原型。
 
-### Slide 2. Problem Definition
+### 第 2 页：问题定义
 
-**Full speech script**
+**完整讲稿**
 
-The core problem is evidence-grounded question answering over financial regulation documents. These documents are long, semi-structured, and often organized by articles, dates, issuing agencies, and validity status. If we use only keyword search, users must know the exact terms used in the document. If we use only an LLM, the model may generate an answer that is fluent but not supported by the document. For regulation-related questions, this is risky. The system therefore needs to retrieve relevant text, keep citations, handle document metadata such as status and category, and then generate an answer based on the retrieved evidence.
+这个项目解决的是金融监管制度文档上的证据化问答问题。监管制度通常篇幅较长，结构半规范化，并且包含条文编号、发布日期、发文机关、文号和时效状态等信息。如果只用关键词搜索，用户必须知道文档中的准确表述；如果只用大模型直接回答，模型可能生成看似合理但没有制度依据的内容。对于监管制度场景，这是不可接受的，因为用户需要知道答案来自哪一条、哪一份文件。因此系统需要先检索相关证据，再基于证据生成答案，同时保留引用、时效和可追溯信息。
 
-**Transition**
+**过渡句**
 
-This leads to the reason why I chose a RAG architecture.
+这也是我选择 RAG 架构的原因。
 
-**Short version for memorization**
+**记忆版**
 
-The problem is answering regulatory questions with evidence. Keyword search lacks semantic flexibility, and LLM-only answers risk hallucination. RAG combines retrieval and controlled generation.
+问题是做制度文档的可溯源问答。关键词搜索不够灵活，LLM 直接回答有幻觉风险，所以需要 RAG。
 
-### Slide 3. Why RAG
+### 第 3 页：为什么使用 RAG
 
-**Full speech script**
+**完整讲稿**
 
-RAG is suitable because it separates knowledge access from answer generation. Retrieval first narrows the context to a small set of relevant chunks. Then the LLM generates an answer from that context. This reduces token cost and makes the answer auditable through citations. In this repository, the `/qa` endpoint first calls the retriever and then passes citations to the RAG service. The prompt explicitly tells the model to answer only according to the given articles and to state uncertainty when evidence is insufficient. This does not completely eliminate hallucination, but it gives the system a stronger grounding mechanism than direct LLM prompting.
+RAG 的优势在于把知识获取和答案生成拆开。系统先检索一小批相关条文，再把这些条文作为上下文交给大模型生成答案。这样做可以降低上下文长度和 token 成本，也能让答案附带引用依据。在本仓库中，`/qa` 接口会先调用 retriever 得到 citations，再把 citations 交给 RAGService。Prompt 中明确要求模型“仅根据给定条文回答，依据不足时说明不确定”。这不能彻底消除幻觉，但比直接让大模型自由回答更可控，也更适合制度问答。
 
-**Transition**
+**过渡句**
 
-Next, I will show how the system is organized at the architecture level.
+下面看整个系统在工程上是如何组织的。
 
-**Short version for memorization**
+**记忆版**
 
-RAG is used to retrieve evidence first and generate later. It improves traceability, controls context size, and reduces unsupported generation.
+RAG 先检索证据再生成答案，优势是可追溯、上下文更小、生成更受约束。
 
-### Slide 4. Overall Architecture
+### 第 4 页：总体架构
 
-**Full speech script**
+**完整讲稿**
 
-The system is built around FastAPI, MySQL, Milvus, and OpenAI-compatible model APIs. FastAPI exposes routes under `/api/v1`. MySQL stores structured data, including documents, chunks, ingest tasks, QA records, citations, and favorites. Milvus stores chunk embeddings and metadata fields for vector search. The embedding service calls an API endpoint or uses hash embedding in fallback development mode. The LLM service uses LangChain if available and can fall back to direct HTTP requests. This separation is important: MySQL is used for reliable structured persistence, while Milvus is used for approximate vector search.
+系统主要由 FastAPI、MySQL、Milvus 和 OpenAI-Compatible 模型 API 组成。FastAPI 提供 `/api/v1` 下的后端接口。MySQL 保存结构化数据，包括 documents、chunks、ingest_tasks、qa_records、qa_citations 和 favorites。Milvus 保存 chunk 的向量，用于语义检索。Embedding 和 Chat 模型都通过可配置的 OpenAI-Compatible 接口调用。这样的分层设计比较清晰：MySQL 负责可靠的结构化存储和状态记录，Milvus 负责向量相似度检索，FastAPI 负责对外暴露服务。
 
-**Transition**
+**过渡句**
 
-Now I will walk through how raw documents become searchable knowledge.
+接下来我按数据进入系统的顺序，先讲文档导入流水线。
 
-**Short version for memorization**
+**记忆版**
 
-FastAPI provides APIs, MySQL stores structured records, Milvus stores vectors, and model APIs provide embedding and chat generation.
+FastAPI 提供接口，MySQL 存结构化数据，Milvus 存向量，模型 API 负责 embedding 和生成。
 
-### Slide 5. Document Ingestion Pipeline
+### 第 5 页：文档导入流水线
 
-**Full speech script**
+**完整讲稿**
 
-Document ingestion is handled by `DocumentPipelineService`. The pipeline includes several stages: file hash, parse, clean, metadata extraction, metadata application, optional old vector deletion, chunking, embedding, vector upsert, and database commit. This staged design is useful because document processing can fail in many places, especially parsing and embedding. The repository also includes an ingest task service with states such as pending, running, retrying, success, and dead. Each task records stage metrics and errors. So the system is not just a one-shot script; it has basic operational visibility.
+文档导入由 `DocumentPipelineService` 编排。它包含 hash、parse、clean、metadata、apply_metadata、vector_delete、chunk、embedding、vector_upsert 和 database_commit 等阶段。解析器支持 docx、pdf、doc、图片和普通文本，图片通过 OCR 处理。系统还有 ingest task 服务，任务状态包括 pending、running、retrying、success 和 dead。每个阶段都会记录耗时和错误信息。这一点很重要，因为真实文档导入中最容易出问题的就是解析和 embedding，所以系统需要能看到失败发生在哪个阶段，而不是只有一个模糊的失败结果。
 
-**Transition**
+**过渡句**
 
-The next important step in ingestion is how the document is split into chunks.
+导入之后，一个关键问题是如何把长文档切成适合检索的 chunk。
 
-**Short version for memorization**
+**记忆版**
 
-The ingestion pipeline parses files, extracts metadata, chunks text, embeds chunks, writes MySQL records, and upserts Milvus vectors. Task states make failures observable.
+导入流水线负责解析、清洗、元数据、切分、embedding 和向量入库；任务状态让失败可观测。
 
-### Slide 6. Chunking Strategy
+### 第 6 页：Chunking 策略
 
-**Full speech script**
+**完整讲稿**
 
-Chunking appears in `Chunker`. The system first tries to split text by Chinese regulation article patterns, especially `第X条`, and it also tracks chapter patterns like `第X章`. This is domain-aware because regulation documents are naturally organized by articles. If no article pattern is found, the system falls back to fixed-size window chunking with overlap. The trade-off is clear: article chunks are more explainable and precise, while sliding windows make the system robust for less structured files. However, smaller chunks can lose surrounding context, so the generation stage later controls how many chunks are assembled into the prompt.
+切分逻辑在 `Chunker` 中。系统优先使用制度文档的条文结构，也就是识别 `第X条`，同时识别 `第X章`。这种方式比较适合监管文件，因为条文天然就是引用和问答的基本单位。如果文档没有条文结构，系统会回退到固定窗口切分，默认最大长度 500 字符，重叠 80 字符。这里有一个取舍：较小的 chunk 检索精度更高，但可能丢失上下文；较大的 chunk 上下文更完整，但会增加噪声和生成成本。当前系统选择条文优先，是为了让引用更清晰。
 
-**Transition**
+**过渡句**
 
-After chunking, each chunk must be represented as a vector for dense retrieval.
+切分完成后，每个 chunk 会被转换成向量并写入 Milvus。
 
-**Short version for memorization**
+**记忆版**
 
-The system uses article-first chunking and window fallback. This keeps regulation structure when possible while still supporting unstructured text.
+系统优先按 `第X条` 切分，失败时窗口切分。这保证制度引用更清楚。
 
-### Slide 7. Embedding and Vector Index
+### 第 7 页：Embedding 与向量索引
 
-**Full speech script**
+**完整讲稿**
 
-Embedding is implemented in `EmbeddingService`. In API mode, it deduplicates repeated texts, sends batch requests to an OpenAI-compatible `/embeddings` endpoint, sorts results by returned index, normalizes dimensions, and normalizes vector length. The vectors are stored in Milvus by `VectorStoreService`. The Milvus collection is named `finance_policy_chunks`, and it includes both vector and metadata fields such as region, category, status, and article number. The index configured in code is `IVF_FLAT` with `COSINE` metric, and the search uses the configurable `nprobe` parameter. This is where ANN-style vector search appears in the system.
+Embedding 模块在 `EmbeddingService` 中。API 模式下，它会对重复文本去重，批量请求 `/embeddings` 接口，按返回的 index 对齐结果，并进行维度归一和向量 L2 归一。向量写入 Milvus 的逻辑在 `VectorStoreService` 中。Milvus collection 名为 `finance_policy_chunks`，字段包括 vector_id、doc_id、chunk_text、region、category、status、article_no 和 embedding。代码里配置的索引是 IVF_FLAT，距离度量是 COSINE，并通过 nprobe 参数控制检索范围。这一部分就是系统中的 ANN 或向量检索组件。
 
-**Transition**
+**过渡句**
 
-With vectors ready, the system can perform hybrid retrieval.
+有了向量索引之后，系统就可以实现混合检索。
 
-**Short version for memorization**
+**记忆版**
 
-Chunks are embedded through an API, normalized, and stored in Milvus. The Milvus index is IVF_FLAT with cosine similarity and configurable nprobe.
+Embedding 会批量、去重、归一化；Milvus 使用 IVF_FLAT + COSINE，支持 metadata 字段过滤。
 
-### Slide 8. Hybrid Retrieval Pipeline
+### 第 8 页：混合检索流程
 
-**Full speech script**
+**完整讲稿**
 
-The retriever combines keyword retrieval and dense vector retrieval. First, it applies structured filters such as status, region, source organization, and category. The keyword branch uses exact query matching and token-based SQL `contains` matching. It then computes a BM25-like score over candidates. The dense branch embeds the query and searches Milvus. After both branches return candidates, the system merges them by chunk ID and marks the source as keyword, vector, or hybrid. This is a practical design because exact regulatory terms and semantic natural-language questions both matter.
+检索逻辑由 `RetrieverService` 实现。它同时使用关键词召回和向量召回。首先应用结构化过滤，例如 status、region、source_org 和 category。关键词分支包括完整 query 命中和 token contains 召回，并在候选集合上计算 BM25-like 分数。向量分支会先把 query 转为 embedding，再到 Milvus 中检索相似向量。两路候选按 chunk_id 合并，并标记来源为 keyword、vector 或 hybrid。这种设计的原因是：监管文本既有精确术语需求，也有自然语言语义查询需求，单一路径不够稳。
 
-**Transition**
+**过渡句**
 
-After retrieval, candidates need to be ranked in a consistent way.
+候选召回之后，还需要一个排序策略来决定最终返回哪些条文。
 
-**Short version for memorization**
+**记忆版**
 
-The retriever uses structured filters, keyword recall, BM25-like scoring, vector recall, candidate merging, and source labels.
+检索是 keyword + vector 双路召回，结构化过滤后合并候选，并标记来源。
 
-### Slide 9. Reranking Design
+### 第 9 页：重排设计
 
-**Full speech script**
+**完整讲稿**
 
-The reranker is a lightweight scoring function rather than a neural cross-encoder. The final score is a weighted sum of keyword score, vector score, status bonus, and hybrid bonus. Keyword score has the largest weight, because in regulatory text exact terms are often important. Vector score adds semantic matching. Status bonus pushes effective documents upward, and hybrid bonus rewards candidates found by both keyword and vector branches. The trade-off is that this reranker is transparent and fast, but the weights are heuristic. The repository does not include training or ablation experiments for these weights.
+重排逻辑在 `RerankService`。它不是神经网络 cross-encoder，而是一个轻量级加权公式。最终分数由关键词分、向量分、status bonus 和 hybrid bonus 组成。关键词分权重更高，是因为制度文档中精确术语很重要；向量分补充语义匹配；status bonus 让现行有效文件更靠前；hybrid bonus 奖励同时被关键词和向量命中的候选。这个方案的优点是快、可解释、容易调试；不足是权重是启发式设定，仓库中还没有消融实验或学习式调参。
 
-**Transition**
+**过渡句**
 
-The top-ranked chunks are then used to build the prompt for answer generation.
+排好序的 citations 会进入生成阶段，组成 Prompt。
 
-**Short version for memorization**
+**记忆版**
 
-Reranking is interpretable: keyword, vector, status, and hybrid signals are combined. It is fast but heuristic.
+重排公式结合关键词、向量、时效和 hybrid 命中。它可解释但权重是启发式的。
 
-### Slide 10. Generation and Prompt Assembly
+### 第 10 页：生成与 Prompt 组装
 
-**Full speech script**
+**完整讲稿**
 
-Answer generation is handled by `RAGService` and `LLMService`. The QA endpoint first retrieves citations, then calls the RAG service. The LLM service builds a context block from retrieved chunk texts, with limits on number of chunks, characters per chunk, and total context length. This is a recall-latency trade-off: more context may improve completeness, but increases latency and token cost. The system prompt tells the model to answer only based on the given articles and to state uncertainty if evidence is insufficient. If LangChain fails, raw HTTP is used. If the LLM is unavailable, the system returns a degraded status instead of silently inventing an answer.
+生成由 `RAGService` 和 `LLMService` 完成。QA 接口会先检索 citations，再把 citations 的 chunk_text 传给 LLMService。LLMService 会限制上下文 chunk 数量、每个 chunk 的最大字符数和总字符数。这是召回完整性和延迟之间的取舍：上下文越多，答案可能更完整，但 token 成本和响应时延也更高。Prompt 中明确要求模型只根据给定条文回答，并在依据不足时说明不确定。如果没有证据，系统直接返回 no_evidence；如果 LLM 不可用，返回 degraded 状态，而不是伪造答案。
 
-**Transition**
+**过渡句**
 
-Besides the answer text, the system also returns confidence and traceability signals.
+系统除了生成答案，还会输出可信度和可追溯信号。
 
-**Short version for memorization**
+**记忆版**
 
-The prompt is assembled from top citation chunks with length limits. The LLM is constrained to answer from evidence, and failures return explicit degraded status.
+Prompt 来自 top citations，并有长度限制。无证据和 LLM 不可用都会显式降级。
 
-### Slide 11. Confidence and Traceability
+### 第 11 页：可信度与可追溯
 
-**Full speech script**
+**完整讲稿**
 
-The answer response includes citations, related articles, confidence score, consistency score, evidence coverage, generation status, and degraded reason. The consistency score is based on token overlap between the answer and cited chunks. Evidence coverage measures how much of the answer vocabulary is covered by the evidence. These are lightweight signals, not formal factuality proofs. Their purpose is to make the system more transparent and easier to debug. QA records and citations are also persisted in MySQL, so previous questions and their evidence can be inspected later.
+QA 返回结果不只是 answer，还包括 citations、related_articles、confidence_score、consistency_score、evidence_coverage、generation_status 和 degraded_reason。consistency_score 基于答案和引用条文的 token 重合度，evidence_coverage 衡量答案中有多少词能被证据覆盖。它们不是严格的事实正确性证明，但可以作为透明度和调试信号。系统还会把 QA 记录和引用持久化到 MySQL，这样之后可以检查某个答案当时依据了哪些条文。
 
-**Transition**
+**过渡句**
 
-Next, I will describe what evaluation is included in the repository.
+接下来介绍仓库中已有的评测和实验相关内容。
 
-**Short version for memorization**
+**记忆版**
 
-The system returns answer, citations, confidence, consistency, evidence coverage, and generation status. These are transparency signals, not absolute correctness guarantees.
+系统返回引用、置信度、一致性和证据覆盖率。这些是透明度信号，不是绝对正确性证明。
 
-### Slide 12. Evaluation and Demo
+### 第 12 页：评测与演示
 
-**Full speech script**
+**完整讲稿**
 
-The repository includes an acceptance evaluation script. It tests search, QA, related search, timeliness questions, and OCR-related questions. The metrics include success rate, keyword-based accuracy, keyword-based recall, average latency, and p95 latency. This is useful for checking whether the system works end-to-end, but it is not a strict information retrieval benchmark. The test set uses expected keywords, not manually labeled gold chunks. The repository also includes unit and contract tests for API behavior, embedding, vector score conversion, ingest task claim, health, and LLM fallback.
+仓库中包含 `evaluate_acceptance.py` 验收评测脚本，覆盖 search、QA、related search、timeliness 和 OCR 类型问题。指标包括 success_rate、基于关键词的 accuracy、基于关键词的 recall、平均时延和 p95 时延。这个评测能证明系统链路可运行，返回结果覆盖预期关键词。但是它不是严格的信息检索评测，因为它没有人工标注的 gold chunk。仓库还包含单元测试和契约测试，覆盖 API、embedding、vector score、ingest task claim、health 和 LLM 行为。
 
-**Transition**
+**过渡句**
 
-Based on this implementation, I will separate engineering contribution from research contribution.
+基于这些实现，我会区分工程贡献和研究贡献。
 
-**Short version for memorization**
+**记忆版**
 
-Evaluation is keyword-based acceptance testing plus unit tests. It proves the pipeline works, but it is not a gold-label retrieval benchmark.
+当前评测是关键词验收评测和单元测试，能证明系统可运行，但不是 gold chunk benchmark。
 
-### Slide 13. Engineering Highlights vs Research Contribution
+### 第 13 页：工程亮点与研究贡献边界
 
-**Full speech script**
+**完整讲稿**
 
-I position this project mainly as an engineering RAG system. The engineering contribution is the end-to-end backend: ingestion, chunking, embedding, vector database, hybrid retrieval, generation, citation persistence, health checks, metrics, tests, and Docker deployment. The research-oriented design points are article-aware chunking, metadata-aware retrieval, and evidence-based confidence signals. However, I do not claim a new ANN algorithm or a new LLM method. The value is in integrating existing techniques into a traceable domain-specific RAG workflow.
+我会把这个项目主要定位为工程型 RAG 系统。工程贡献是打通了端到端后端链路：文档导入、条文切分、embedding、Milvus 向量库、混合检索、重排、生成、引用持久化、健康检查、指标、测试和 Docker 部署。比较有研究意味的设计点包括条文感知切分、元数据感知检索、时效状态处理和证据可信度信号。但我不会声称提出了新的 ANN 算法或新的大模型方法。这个项目的价值在于把已有技术组合成一个可运行、可追溯的领域 RAG 系统。
 
-**Transition**
+**过渡句**
 
-Finally, I will be explicit about limitations and future work.
+最后我说明目前系统的局限和后续改进方向。
 
-**Short version for memorization**
+**记忆版**
 
-The main contribution is engineering integration. Research-like parts are domain-aware chunking, metadata filtering, and confidence signals, but not a new model or algorithm.
+主要贡献是工程集成；研究性设计包括条文切分、元数据过滤和可信度信号，但不是新算法。
 
-### Slide 14. Limitations and Future Work
+### 第 14 页：局限与未来工作
 
-**Full speech script**
+**完整讲稿**
 
-There are several limitations. First, the repository does not include a frontend or authentication. Second, old abnormal `.doc` files may still fail parsing and may need LibreOffice conversion or manual conversion. Third, the evaluation lacks gold chunk labels and ablation studies. Fourth, the reranker weights are heuristic. Future work should first build a gold chunk evaluation set, because it would directly measure whether the retriever finds the correct article. Then I would improve document conversion, add authentication and frontend, and consider a stronger reranker such as a cross-encoder if latency allows.
+当前系统还有几个局限。第一，仓库没有前端和认证鉴权。第二，一些异常老 `.doc` 文件仍可能解析失败，后续可以引入 LibreOffice 转换或人工转码兜底。第三，评测还缺少 gold chunk 标注和消融实验。第四，重排权重是启发式的，不是训练得到的。后续我会优先补 gold chunk 评测集，因为它能直接衡量系统是否找到了正确条文；然后再优化文档转换、前端、认证，以及在时延允许的情况下引入 cross-encoder reranker。
 
-**Transition**
+**过渡句**
 
-I will now conclude the presentation.
+最后总结整个项目。
 
-**Short version for memorization**
+**记忆版**
 
-The main gaps are frontend, auth, abnormal doc parsing, gold chunk evaluation, and heuristic reranking. Future work should start with stricter evaluation.
+主要局限是前端、鉴权、异常 doc、gold chunk 评测和启发式重排。未来优先补严格评测。
 
-### Slide 15. Conclusion
+### 第 15 页：总结
 
-**Full speech script**
+**完整讲稿**
 
-To conclude, this project implements a backend RAG workflow for financial regulation documents. It turns raw files into chunks and embeddings, stores structured data in MySQL, stores vectors in Milvus, retrieves evidence through hybrid search, reranks candidates, generates answers with citations, and records QA history. The current version is suitable as a backend acceptance prototype. Its main strength is traceability and operational completeness. Its next stage should focus on stricter evaluation, frontend, authentication, and production hardening. Thank you, and I welcome your questions.
+总结来说，这个项目实现了一个面向金融制度文档的后端 RAG 工作流。它能把原始文件转成 chunk 和 embedding，用 MySQL 保存结构化数据，用 Milvus 保存向量，通过混合检索找到证据，经过重排后把 citations 交给 LLM 生成答案，并保存 QA 历史。当前版本适合作为后端验收原型。它的主要优势是链路完整、证据可追溯、工程上可观测。后续重点是更严格的检索评测、前端、认证和生产化加固。谢谢各位老师，欢迎提问。
 
-**Transition**
+**过渡句**
 
-End of presentation.
+答辩陈述结束。
 
-**Short version for memorization**
+**记忆版**
 
-The system is a complete backend RAG prototype with ingestion, retrieval, generation, citation, persistence, and evaluation. It is ready for defense but not full production.
+系统完成了导入、检索、生成、引用、持久化和评测，是可交付的后端验收版。
 
-## Part 2. Full 8-Minute Defense Speech
+## 第二部分：8 分钟完整答辩稿
 
-Good morning, teachers. My project is a Financial Policy RAG Question Answering System.
+各位老师好，我的项目是“基于 RAG 的金融制度知识问答系统”。
 
-The goal is to build a backend system that can ingest financial regulation documents, retrieve relevant articles, and generate answers with citations. The current version is backend-first. It focuses on the core technical pipeline: document parsing, metadata extraction, chunking, embedding, vector indexing, hybrid retrieval, LLM-based answer generation, QA persistence, health checks, and evaluation scripts. It does not include a frontend or authentication module yet, so I will present it as a backend acceptance prototype rather than a complete production product. [pause]
+这个系统的目标是构建一个后端服务，能够导入金融监管制度文档，检索相关条文，并生成带引用依据的答案。当前版本是后端优先版本，主要覆盖文档解析、元数据抽取、条文切分、embedding、向量索引、混合检索、LLM 问答生成、QA 记录持久化、健康检查和验收评测。它目前不包含前端和认证鉴权模块，所以我会把它定位为后端验收原型，而不是完整商业产品。系统设计的核心思想是：答案必须能追溯到原始制度条文，而不是完全依赖大模型内部知识。这里暂停一下。
 
-The problem I want to solve is evidence-grounded question answering over financial regulation documents. These documents are usually long, semi-structured, and organized by articles, dates, issuing agencies, and validity status. If we use only keyword search, users must know the exact wording used in the document. If we use only an LLM, the model may produce a fluent but unsupported answer. This is risky in a regulation scenario, because users need to know which article supports the answer. Therefore, the system needs retrieval, citation, metadata handling, and controlled generation.
+这个项目解决的是金融监管制度文档上的证据化问答问题。监管制度通常篇幅较长，结构半规范化，并且包含条文编号、发布日期、发文机关、文号和时效状态等信息。如果只用关键词搜索，用户必须知道文档中的准确表述；如果只用大模型直接回答，模型可能生成看似合理但没有制度依据的内容。对于监管制度场景，这是不可接受的，因为用户需要知道答案来自哪一条、哪一份文件。因此系统需要先检索相关证据，再基于证据生成答案，同时保留引用、时效和可追溯信息。
 
-This is why I chose a RAG architecture. RAG separates knowledge access from answer generation. Retrieval first narrows the context to a small set of relevant chunks. Then the LLM generates the answer from that context. This reduces token cost and makes the answer auditable. In this repository, the `/qa` endpoint first calls the retriever, gets citations, and then passes the citations to the RAG service. The prompt explicitly tells the model to answer only according to the given articles and to state uncertainty if evidence is insufficient. RAG does not completely eliminate hallucination, but it gives the system a stronger grounding mechanism than direct LLM prompting. [pause]
+这也是我选择 RAG 架构的原因。RAG 的优势在于把知识获取和答案生成拆开。系统先检索一小批相关条文，再把这些条文作为上下文交给大模型生成答案。这样做可以降低上下文长度和 token 成本，也能让答案附带引用依据。在本仓库中，`/qa` 接口会先调用 retriever 得到 citations，再把 citations 交给 RAGService。Prompt 中明确要求模型“仅根据给定条文回答，依据不足时说明不确定”。这不能彻底消除幻觉，但比直接让大模型自由回答更可控，也更适合制度问答。
 
-At the architecture level, the system uses FastAPI, MySQL, Milvus, and OpenAI-compatible model APIs. FastAPI exposes the backend routes under `/api/v1`. MySQL stores structured data, including documents, chunks, ingest tasks, QA records, citations, and favorites. Milvus stores dense vectors for chunk-level semantic search. The embedding service calls an API endpoint in production mode and also supports hash embedding for development. The LLM service uses LangChain if available, and can fall back to raw HTTP calls. This separation is intentional: MySQL is reliable for structured metadata and persistence, while Milvus is designed for vector similarity search.
+从总体架构看，系统主要由 FastAPI、MySQL、Milvus 和 OpenAI-Compatible 模型 API 组成。FastAPI 提供 `/api/v1` 下的后端接口。MySQL 保存结构化数据，包括 documents、chunks、ingest_tasks、qa_records、qa_citations 和 favorites。Milvus 保存 chunk 的向量，用于语义检索。Embedding 和 Chat 模型都通过可配置的 OpenAI-Compatible 接口调用。这样的分层设计比较清晰：MySQL 负责可靠的结构化存储和状态记录，Milvus 负责向量相似度检索，FastAPI 负责对外暴露服务。
 
-The first main workflow is document ingestion. It is implemented in `DocumentPipelineService`. The stages are file hash, parse, clean, metadata extraction, metadata application, optional old vector deletion, chunking, embedding, vector upsert, and database commit. The parser supports `.docx`, `.pdf`, `.doc`, images, and plain text. Images are handled through OCR. The system also has an ingest task service with states such as pending, running, retrying, success, and dead. Each task records stage metrics and error messages. This is useful because parsing and embedding can fail, and the system should expose where and why a failure happens.
+第一个核心流程是文档导入。文档导入由 `DocumentPipelineService` 编排。它包含 hash、parse、clean、metadata、apply_metadata、vector_delete、chunk、embedding、vector_upsert 和 database_commit 等阶段。解析器支持 docx、pdf、doc、图片和普通文本，图片通过 OCR 处理。系统还有 ingest task 服务，任务状态包括 pending、running、retrying、success 和 dead。每个阶段都会记录耗时和错误信息。这一点很重要，因为真实文档导入中最容易出问题的就是解析和 embedding，所以系统需要能看到失败发生在哪个阶段，而不是只有一个模糊的失败结果。
 
-For chunking, the system uses a simple but domain-aware strategy. It first tries to split text by Chinese regulation article patterns, especially `第X条`, and it also tracks chapter patterns like `第X章`. This matches the natural structure of regulation documents. If no article pattern is found, it falls back to fixed-size window chunking with overlap. The trade-off is that article chunks are explainable and precise, while window chunks make the system robust for less structured files. Smaller chunks improve retrieval precision, but may lose surrounding context, so the generation stage later controls how many chunks are assembled into the prompt. [pause]
+导入之后，一个关键问题是如何切分文本。切分逻辑在 `Chunker` 中。系统优先使用制度文档的条文结构，也就是识别 `第X条`，同时识别 `第X章`。这种方式比较适合监管文件，因为条文天然就是引用和问答的基本单位。如果文档没有条文结构，系统会回退到固定窗口切分，默认最大长度 500 字符，重叠 80 字符。这里有一个取舍：较小的 chunk 检索精度更高，但可能丢失上下文；较大的 chunk 上下文更完整，但会增加噪声和生成成本。当前系统选择条文优先，是为了让引用更清晰。
 
-After chunking, each chunk is converted into an embedding. In API mode, the embedding service deduplicates repeated texts, sends batch requests to an OpenAI-compatible `/embeddings` endpoint, sorts returned vectors by index, normalizes vector dimensions, and normalizes vector length. The vectors are stored in a Milvus collection named `finance_policy_chunks`. The collection includes both vector data and metadata fields such as region, category, status, and article number. The configured vector index is `IVF_FLAT` with cosine similarity, and search uses the configurable `nprobe` parameter. This is where ANN-style vector search appears in the system.
+切分完成后，每个 chunk 会被转换成向量。Embedding 模块在 `EmbeddingService` 中。API 模式下，它会对重复文本去重，批量请求 `/embeddings` 接口，按返回的 index 对齐结果，并进行维度归一和向量 L2 归一。向量写入 Milvus 的逻辑在 `VectorStoreService` 中。Milvus collection 名为 `finance_policy_chunks`，字段包括 vector_id、doc_id、chunk_text、region、category、status、article_no 和 embedding。代码里配置的索引是 IVF_FLAT，距离度量是 COSINE，并通过 nprobe 参数控制检索范围。这一部分就是系统中的 ANN 或向量检索组件。
 
-The retrieval pipeline is hybrid. It combines keyword retrieval and dense vector retrieval. First, it applies structured filters such as status, region, source organization, and category. The keyword branch uses exact query matching and token-based SQL `contains` matching. It then computes a BM25-like score over the candidate set. The dense branch embeds the query and searches Milvus. After both branches return candidates, the system merges them by chunk ID and marks the source as keyword, vector, or hybrid. This design is practical because exact legal terms and semantic natural-language questions are both important in regulation documents.
+检索逻辑由 `RetrieverService` 实现。它同时使用关键词召回和向量召回。首先应用结构化过滤，例如 status、region、source_org 和 category。关键词分支包括完整 query 命中和 token contains 召回，并在候选集合上计算 BM25-like 分数。向量分支会先把 query 转为 embedding，再到 Milvus 中检索相似向量。两路候选按 chunk_id 合并，并标记来源为 keyword、vector 或 hybrid。这种设计的原因是：监管文本既有精确术语需求，也有自然语言语义查询需求，单一路径不够稳。
 
-After retrieval, the system reranks candidates using a lightweight scoring function. The final score combines keyword score, vector score, status bonus, and hybrid bonus. Keyword score has the largest weight, because exact terminology is important in financial regulation. Vector score adds semantic matching. Status bonus pushes effective documents upward, and hybrid bonus rewards candidates found by both retrieval branches. This reranker is not a neural cross-encoder. The advantage is that it is transparent and fast. The limitation is that the weights are heuristic and are not learned from training data.
+候选召回之后，系统会进行重排。重排逻辑在 `RerankService`。它不是神经网络 cross-encoder，而是一个轻量级加权公式。最终分数由关键词分、向量分、status bonus 和 hybrid bonus 组成。关键词分权重更高，是因为制度文档中精确术语很重要；向量分补充语义匹配；status bonus 让现行有效文件更靠前；hybrid bonus 奖励同时被关键词和向量命中的候选。这个方案的优点是快、可解释、容易调试；不足是权重是启发式设定，仓库中还没有消融实验或学习式调参。
 
-For generation, the QA endpoint passes retrieved citations to `RAGService` and `LLMService`. The LLM service builds a context block from the retrieved chunk texts. It limits the number of chunks, characters per chunk, and total context length. This is a recall-versus-latency trade-off: more context may improve completeness, but it increases token cost and response time. The system prompt tells the model to answer only based on the given articles and to state uncertainty if the evidence is insufficient. If there is no evidence, the RAG service returns a no-evidence response without calling the LLM. If the LLM is unavailable, the service returns a degraded status instead of silently inventing an answer.
+生成由 `RAGService` 和 `LLMService` 完成。QA 接口会先检索 citations，再把 citations 的 chunk_text 传给 LLMService。LLMService 会限制上下文 chunk 数量、每个 chunk 的最大字符数和总字符数。这是召回完整性和延迟之间的取舍：上下文越多，答案可能更完整，但 token 成本和响应时延也更高。Prompt 中明确要求模型只根据给定条文回答，并在依据不足时说明不确定。如果没有证据，系统直接返回 no_evidence；如果 LLM 不可用，返回 degraded 状态，而不是伪造答案。
 
-The answer is not just plain text. It includes citations, related article numbers, confidence score, consistency score, evidence coverage, generation status, and degraded reason. The consistency score is based on token overlap between the answer and cited chunks. Evidence coverage checks how much of the answer vocabulary appears in the evidence. These are not formal correctness proofs, but they are useful transparency signals. QA records and citations are also persisted in MySQL, so previous questions and their evidence can be inspected later. [pause]
+QA 返回结果不只是 answer，还包括 citations、related_articles、confidence_score、consistency_score、evidence_coverage、generation_status 和 degraded_reason。consistency_score 基于答案和引用条文的 token 重合度，evidence_coverage 衡量答案中有多少词能被证据覆盖。它们不是严格的事实正确性证明，但可以作为透明度和调试信号。系统还会把 QA 记录和引用持久化到 MySQL，这样之后可以检查某个答案当时依据了哪些条文。
 
-For evaluation, the repository includes an acceptance evaluation script. It tests search, QA, related search, timeliness questions, and OCR-related questions. The metrics include success rate, keyword-based accuracy, keyword-based recall, average latency, and p95 latency. This proves the pipeline works end-to-end under the fixed evaluation set. However, it is not a strict information retrieval benchmark, because it uses expected keywords rather than manually labeled gold chunks. The repository also includes unit and contract tests for API behavior, embedding, vector score conversion, ingest task claim, health check, and LLM behavior.
+评测方面，仓库中包含 `evaluate_acceptance.py` 验收评测脚本，覆盖 search、QA、related search、timeliness 和 OCR 类型问题。指标包括 success_rate、基于关键词的 accuracy、基于关键词的 recall、平均时延和 p95 时延。这个评测能证明系统链路可运行，返回结果覆盖预期关键词。但是它不是严格的信息检索评测，因为它没有人工标注的 gold chunk。仓库还包含单元测试和契约测试，覆盖 API、embedding、vector score、ingest task claim、health 和 LLM 行为。
 
-I would position this project mainly as an engineering RAG system. The engineering contribution is the end-to-end backend integration: ingestion, chunking, embedding, vector database, hybrid retrieval, generation, citation persistence, health checks, metrics, tests, and Docker deployment. The research-oriented design points are article-aware chunking, metadata-aware retrieval, and evidence-based confidence signals. I do not claim a new ANN algorithm or a new LLM method. The value is in integrating existing techniques into a traceable domain-specific RAG workflow.
+我会把这个项目主要定位为工程型 RAG 系统。工程贡献是打通了端到端后端链路：文档导入、条文切分、embedding、Milvus 向量库、混合检索、重排、生成、引用持久化、健康检查、指标、测试和 Docker 部署。比较有研究意味的设计点包括条文感知切分、元数据感知检索、时效状态处理和证据可信度信号。但我不会声称提出了新的 ANN 算法或新的大模型方法。这个项目的价值在于把已有技术组合成一个可运行、可追溯的领域 RAG 系统。
 
-There are also limitations. The repository does not include a frontend or authentication. Some abnormal old `.doc` files may still fail parsing and may need LibreOffice conversion or manual conversion. The evaluation lacks gold chunk labels and ablation studies. The reranker weights are heuristic. In future work, I would first build a gold chunk evaluation set, because it directly measures whether the retriever finds the correct article. Then I would improve document conversion, add authentication and frontend, and consider a stronger reranker such as a cross-encoder if latency allows.
+当前系统还有几个局限。第一，仓库没有前端和认证鉴权。第二，一些异常老 `.doc` 文件仍可能解析失败，后续可以引入 LibreOffice 转换或人工转码兜底。第三，评测还缺少 gold chunk 标注和消融实验。第四，重排权重是启发式的，不是训练得到的。后续我会优先补 gold chunk 评测集，因为它能直接衡量系统是否找到了正确条文；然后再优化文档转换、前端、认证，以及在时延允许的情况下引入 cross-encoder reranker。
 
-To conclude, this project implements a backend RAG workflow for financial regulation documents. It turns raw files into chunks and embeddings, stores structured data in MySQL, stores vectors in Milvus, retrieves evidence through hybrid search, reranks candidates, generates answers with citations, and records QA history. The current version is suitable as a backend acceptance prototype. Its main strength is traceability and operational completeness. Its next stage should focus on stricter evaluation, frontend, authentication, and production hardening.
+总结来说，这个项目实现了一个面向金融制度文档的后端 RAG 工作流。它能把原始文件转成 chunk 和 embedding，用 MySQL 保存结构化数据，用 Milvus 保存向量，通过混合检索找到证据，经过重排后把 citations 交给 LLM 生成答案，并保存 QA 历史。当前版本适合作为后端验收原型。它的主要优势是链路完整、证据可追溯、工程上可观测。后续重点是更严格的检索评测、前端、认证和生产化加固。谢谢各位老师，欢迎提问。
 
-Thank you. I welcome your questions.
+## 第三部分：2 分钟精简版
 
-## Part 3. Two-Minute Condensed Version
+各位老师好，我的项目是“基于 RAG 的金融制度知识问答系统”，它是一个后端优先的金融监管制度文档问答系统。
 
-Good morning, teachers. My project is a backend-first RAG system for financial regulation documents.
+这个项目解决的问题是：监管制度文档长、结构复杂，而且回答必须能追溯到制度原文。单纯关键词搜索不够灵活，单纯让大模型回答又有幻觉风险。所以系统采用 RAG：先检索证据条文，再基于证据生成答案。
 
-The problem is that regulation documents are long, article-based, and require traceable answers. Keyword search is not flexible enough for natural-language questions, while LLM-only answers may hallucinate. Therefore, I use RAG: retrieve evidence first, then generate an answer based on the retrieved evidence.
+系统架构由 FastAPI、MySQL、Milvus 和 OpenAI-Compatible 模型 API 组成。MySQL 保存文档、chunk、导入任务、QA 记录和引用；Milvus 保存 chunk 向量。导入流程包括解析、清洗、元数据抽取、条文切分、embedding 和向量入库。
 
-The system is built with FastAPI, MySQL, Milvus, and OpenAI-compatible model APIs. MySQL stores documents, chunks, ingest tasks, QA records, citations, and favorites. Milvus stores chunk embeddings for vector search. The ingestion pipeline parses files, cleans text, extracts metadata, chunks by regulation articles such as `第X条`, embeds chunks, and writes both MySQL records and Milvus vectors.
+检索流程是混合检索。系统同时使用关键词召回和 Milvus 向量召回，然后按 chunk_id 合并候选，并用关键词分、向量分、时效状态和 hybrid bonus 做重排。这样可以兼顾监管文本中的精确术语和自然语言语义查询。
 
-The retrieval pipeline is hybrid. It combines keyword recall, BM25-like scoring, and Milvus vector search. It then merges candidates by chunk ID and reranks them using keyword score, vector score, status bonus, and hybrid bonus. This balances exact legal terminology and semantic matching.
+生成阶段中，QA 接口先拿到 citations，再把 top chunks 组装成 Prompt。Prompt 要求模型只根据给定条文回答。没有证据时返回 no_evidence，LLM 不可用时返回 degraded，不会静默伪造答案。返回结果包括 answer、citations、confidence_score、consistency_score 和 evidence_coverage。
 
-For generation, the QA endpoint retrieves citations first, assembles a bounded prompt from top chunks, and asks the LLM to answer only according to the given articles. If there is no evidence, it returns a no-evidence response. If the LLM is unavailable, it returns a degraded status rather than fabricating an answer. The response includes citations, confidence score, consistency score, evidence coverage, and generation status.
+仓库中包含验收评测脚本和单元测试。当前评测是关键词命中式验收评测，可以证明链路可运行，但还不是严格的 gold chunk benchmark。未来需要补人工标注的正确 chunk，进一步计算 Recall@K、MRR 和 nDCG。
 
-The repository includes acceptance evaluation scripts and unit tests. The evaluation checks success rate, keyword-based accuracy, keyword-based recall, and latency. However, it is not a strict gold chunk benchmark. Future work should add manually labeled gold chunks, frontend, authentication, better `.doc` conversion, and possibly a stronger reranker.
+总结来说，这个项目不是提出新算法，而是完成了一个面向金融制度文档的可运行、可追溯、可验收的 RAG 后端系统。
 
-In summary, this project is not a new retrieval algorithm, but a complete engineering implementation of a traceable RAG backend for financial policy documents.
+## 第四部分：15 个高频答辩问题与参考回答
 
-## Part 4. Likely Defense Questions and Model Answers
+### 1. 为什么选择 RAG，而不是直接使用大模型？
 
-### 1. Why did you choose RAG instead of only using an LLM?
+因为监管制度问答需要证据来源。RAG 先检索原文条文，再基于条文生成答案，可以返回 citations，降低无依据生成的风险。直接使用大模型无法保证答案来自本地制度库。
 
-Because the domain requires evidence-grounded answers. RAG retrieves source articles first and uses them as context, reducing unsupported generation and enabling citations. LLM-only answering cannot guarantee that the answer comes from the local document collection.
+### 2. 为什么同时使用 MySQL 和 Milvus？
 
-### 2. Why did you use both MySQL and Milvus?
+MySQL 适合保存结构化数据，例如文档元数据、chunk、任务状态、QA 记录和引用；Milvus 适合向量相似度检索。两者职责不同，所以系统同时使用。
 
-MySQL is used for structured data such as documents, chunks, metadata, tasks, QA records, and citations. Milvus is used for vector similarity search. They solve different storage and query problems.
+### 3. ANN 在系统哪里体现？
 
-### 3. Where does ANN appear in the system?
+ANN 或向量检索体现在 `VectorStoreService`。代码创建 Milvus `IVF_FLAT` + `COSINE` 索引，并使用 `nprobe` 参数对 embedding 字段进行向量检索。
 
-ANN-style vector search appears in `VectorStoreService`, where Milvus creates an `IVF_FLAT` index with `COSINE` metric and searches the `embedding` field using `nprobe`.
+### 4. 系统如何切分文档？
 
-### 4. What is the chunking strategy?
+优先识别中文制度条文模式 `第X条`，同时识别 `第X章`。如果无法按条文切分，则回退到固定窗口切分，并带有 overlap。
 
-The system first chunks by regulation article patterns such as `第X条`, and tracks chapter patterns like `第X章`. If no articles are found, it falls back to fixed-size window chunking with overlap.
+### 5. 为什么不用语义切分？
 
-### 5. Why not use semantic chunking?
+监管制度天然有条文结构，条文切分更可解释，也更适合引用。语义切分可能改善边界，但会降低确定性和可解释性，可以作为后续增强。
 
-Semantic chunking may improve boundaries, but regulation documents have explicit article structure. Article-based chunking is deterministic, explainable, and easier to cite. Semantic chunking is a possible future improvement.
+### 6. 为什么要混合关键词和向量检索？
 
-### 6. Why combine keyword and vector retrieval?
+关键词检索适合精确术语、文号和条文名称；向量检索适合自然语言语义查询。两者结合可以提高鲁棒性。
 
-Keyword retrieval is strong for exact legal terms, document names, and article phrases. Vector retrieval is stronger for natural-language semantic matching. Combining both improves robustness.
+### 7. 重排器如何工作？
 
-### 7. How does the reranker work?
+重排器用关键词分、向量分、status bonus 和 hybrid bonus 加权得到最终分数。它是轻量级可解释公式，不是神经网络 reranker。
 
-The reranker computes a weighted score from keyword score, vector score, status bonus, and hybrid bonus. It is lightweight and interpretable, but the weights are heuristic.
+### 8. 重排权重是训练出来的吗？
 
-### 8. Are the reranker weights learned?
+不是。当前权重是启发式设定。仓库没有训练数据和消融实验。后续可以基于 gold chunk 评测集调参或训练 reranker。
 
-No. They are manually defined in code. The repository does not include training data or ablation experiments. A future gold chunk benchmark could be used to tune them.
+### 9. 系统如何降低幻觉？
 
-### 9. How do you reduce hallucination?
+系统先检索 citations，再把 citations 作为上下文交给 LLM；Prompt 要求只根据给定条文回答。没有证据时不调用 LLM，LLM 不可用时返回 degraded 状态。
 
-The system retrieves citations first, constructs a prompt only from retrieved chunks, and instructs the LLM to answer only based on those articles. It also returns citations and confidence signals. This reduces but does not eliminate hallucination.
+### 10. LLM 服务失败怎么办？
 
-### 10. What happens if the LLM service fails?
+`LLMService` 会返回 degraded generation status 和明确提示，不会静默伪造答案。
 
-The LLM service returns a degraded generation status with an explicit message. The system does not silently fabricate an answer.
+### 11. confidence_score 代表什么？
 
-### 11. What does confidence score mean?
+它是启发式可信度分数，综合引用数量、检索分、答案和证据的一致性、证据覆盖率、生成状态和是否命中有效制度。它不是严格正确性证明。
 
-It is a heuristic score combining citation count, retrieval score, answer-evidence consistency, evidence coverage, generation status, and whether the result hits effective documents. It is a transparency signal, not a formal proof of correctness.
+### 12. 系统如何评测？
 
-### 12. How is the system evaluated?
+仓库提供 `evaluate_acceptance.py`，覆盖 search、QA、related、timeliness、OCR 等问题，计算 success_rate、关键词 accuracy、关键词 recall、平均时延和 p95 时延。
 
-The repository includes an acceptance evaluation script. It tests search, QA, related search, timeliness, and OCR-related questions. Metrics include success rate, keyword-based accuracy, keyword-based recall, average latency, and p95 latency.
+### 13. 当前评测有什么不足？
 
-### 13. What is missing from the evaluation?
+当前评测是关键词命中式验收评测，没有人工标注 gold chunk。因此不能严格证明 top-k 检索到了标准正确条文。后续应补 Recall@K、MRR、nDCG 和引用正确率。
 
-The repository does not include a gold chunk benchmark. A stricter evaluation should label the correct document, article, or chunk for each query and compute Recall@K, MRR, nDCG, citation correctness, and answer point accuracy.
+### 14. 系统主要局限是什么？
 
-### 14. What are the main limitations?
+没有前端和认证鉴权；异常老 `.doc` 仍可能解析失败；没有 gold chunk benchmark；没有大规模压测；重排权重是启发式。
 
-The current repository lacks frontend, authentication, gold chunk evaluation, large-scale load testing, and robust conversion for some abnormal old `.doc` files. The reranker weights are also heuristic.
+### 15. 项目主要贡献是什么？
 
-### 15. What is the main contribution?
-
-The main contribution is engineering integration: a complete backend RAG workflow for regulation documents, including ingestion, article-aware chunking, metadata extraction, hybrid retrieval, vector search, reranking, evidence-grounded generation, citations, persistence, health checks, and evaluation scripts.
+主要贡献是工程集成：实现了从文档导入、条文切分、embedding、Milvus 向量检索、混合检索、重排、带引用生成、QA 持久化到评测和部署的完整后端 RAG 流程。
