@@ -1,0 +1,189 @@
+{
+  "info": {
+    "name": "Finance Policy RAG API",
+    "_postman_id": "1f219f2b-1f8f-4df7-9e4b-6c25d77f0d11",
+    "description": "金融制度 RAG 后端接口调试集合（含标签管理、检索、问答、导入任务）",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/health"
+      }
+    },
+    {
+      "name": "Upload Document",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "file",
+              "type": "file",
+              "src": ""
+            }
+          ]
+        },
+        "url": "{{base_url}}/documents/upload"
+      }
+    },
+    {
+      "name": "Ingest Document",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"doc_id\": \"{{doc_id}}\",\n  \"force_reindex\": false\n}"
+        },
+        "url": "{{base_url}}/documents/ingest"
+      }
+    },
+    {
+      "name": "List Documents",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/documents"
+      }
+    },
+    {
+      "name": "Search",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"query\": \"票据业务监管要求\",\n  \"status\": \"effective\",\n  \"top_k\": 5\n}"
+        },
+        "url": "{{base_url}}/search"
+      }
+    },
+    {
+      "name": "Search Related",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"query\": \"票据业务\",\n  \"doc_id\": \"{{doc_id}}\",\n  \"status\": \"effective\",\n  \"top_k\": 5,\n  \"neighbor_window\": 2\n}"
+        },
+        "url": "{{base_url}}/search/related"
+      }
+    },
+    {
+      "name": "QA",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"question\": \"银行承兑汇票业务有哪些重点监管要求？\",\n  \"include_expired\": false,\n  \"top_k\": 5\n}"
+        },
+        "url": "{{base_url}}/qa"
+      }
+    },
+    {
+      "name": "Update Document Tags",
+      "request": {
+        "method": "PATCH",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"tags\": [\"票据\", \"监管\", \"上海\"]\n}"
+        },
+        "url": "{{base_url}}/documents/{{doc_id}}/tags"
+      }
+    },
+    {
+      "name": "List Tag Summary",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/documents/tags"
+      }
+    },
+    {
+      "name": "Create Ingest Tasks",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"doc_ids\": [\"{{doc_id}}\"],\n  \"force_reindex\": false,\n  \"max_attempts\": 3\n}"
+        },
+        "url": "{{base_url}}/documents/ingest/tasks"
+      }
+    },
+    {
+      "name": "Run Ingest Tasks",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"limit\": 20,\n  \"ignore_schedule\": true\n}"
+        },
+        "url": "{{base_url}}/documents/ingest/tasks/run"
+      }
+    },
+    {
+      "name": "List Ingest Tasks",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": "{{base_url}}/documents/ingest/tasks?limit=20"
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8000/api/v1"
+    },
+    {
+      "key": "doc_id",
+      "value": ""
+    }
+  ]
+}

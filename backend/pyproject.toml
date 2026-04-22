@@ -1,0 +1,9 @@
+[project]
+name = "finance-policy-rag"
+version = "0.1.0"
+requires-python = ">=3.11,<3.12"
+description = "Backend-first RAG system for financial regulation documents."
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["."]

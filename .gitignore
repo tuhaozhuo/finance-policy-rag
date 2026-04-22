@@ -1,0 +1,41 @@
+# Python
+__pycache__/
+*.py[cod]
+*.so
+
+# Virtual envs
+.venv/
+backend/.venv/
+venv/
+env/
+
+# Test/cache
+.pytest_cache/
+backend/.pytest_cache/
+**/__pycache__/
+.ruff_cache/
+.mypy_cache/
+
+# OS
+.DS_Store
+
+# Local env
+.env
+.env.runtime
+.env.*
+!.env.example
+*.log
+
+# Runtime data
+*.db
+*.sqlite
+*.sqlite3
+data/*.db
+data/raw/
+data/processed/
+data/ocr_cache/
+backend/data/
+
+# Local source documents / private course materials
+金融监督管理局/
+创新实践课程校企合作企业命题-信雅达.docx

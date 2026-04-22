@@ -1,0 +1,76 @@
+{
+  "search": [
+    {
+      "query": "银行承兑汇票业务监管要求",
+      "expected_keywords": ["银行承兑汇票", "监管"]
+    },
+    {
+      "query": "保险销售行为可回溯",
+      "expected_keywords": ["保险", "销售", "回溯"]
+    },
+    {
+      "query": "消费者权益保护",
+      "expected_keywords": ["消费者", "权益", "保护"]
+    },
+    {
+      "query": "绿色信贷工作意见",
+      "expected_keywords": ["绿色", "信贷"]
+    },
+    {
+      "query": "小微企业金融服务",
+      "expected_keywords": ["小微", "金融", "服务"]
+    }
+  ],
+  "qa": [
+    {
+      "question": "银行承兑汇票业务有哪些重点监管要求？",
+      "expected_keywords": ["银行承兑汇票", "监管"]
+    },
+    {
+      "question": "保险销售行为可回溯的核心要求是什么？",
+      "expected_keywords": ["保险", "销售", "回溯"]
+    },
+    {
+      "question": "监管文件如何保护消费者权益？",
+      "expected_keywords": ["消费者", "权益", "保护"]
+    },
+    {
+      "question": "绿色信贷相关制度对银行提出了哪些要求？",
+      "expected_keywords": ["绿色", "信贷"]
+    },
+    {
+      "question": "小微企业金融服务相关监管关注哪些风险？",
+      "expected_keywords": ["小微", "金融", "服务"]
+    }
+  ],
+  "related": [
+    {
+      "query": "票据业务",
+      "expected_keywords": ["票据"]
+    },
+    {
+      "query": "消费者权益保护",
+      "expected_keywords": ["消费者", "权益"]
+    },
+    {
+      "query": "保险机构合规管理",
+      "expected_keywords": ["保险", "合规"]
+    }
+  ],
+  "timeliness": [
+    {
+      "question": "已废止或失效的制度是否应当优先作为依据？",
+      "expected_keywords": ["废止", "失效", "有效"]
+    },
+    {
+      "question": "当前问答应如何处理历史制度和现行有效制度？",
+      "expected_keywords": ["现行", "有效", "历史"]
+    }
+  ],
+  "ocr": [
+    {
+      "question": "图片扫描件导入后是否可以通过 OCR 建立知识库？",
+      "expected_keywords": ["OCR", "图片", "扫描"]
+    }
+  ]
+}
